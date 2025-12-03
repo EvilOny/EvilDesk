@@ -1,188 +1,145 @@
+import pygame
 import sys
-import sdl2
-import sdl2.ext
 from PIL import Image
 import numpy as np
 
+pygame.init()
 
-# -------------------------------------------------------
-# Получение доминирующего цвета изображения
-# -------------------------------------------------------
-def get_dominant_color(path):
+# ---------- SETTINGS ----------
+SCREEN_W = 480
+SCREEN_H = 800
+FPS = 60
+
+# Paths
+COVER_PATH = "cover.jpg"   # 500x500 or any size
+FONT_PATH = None           # default pygame font
+
+# ---------- FUNCTIONS ----------
+
+def dominant_color(path):
     img = Image.open(path).resize((50, 50))
-    arr = np.array(img).reshape(-1, 3)
-    return tuple(arr.mean(axis=0).astype(int))
+    arr = np.array(img).reshape((-1, 3))
+    avg = arr.mean(axis=0)
+    return tuple(avg.astype(int))
 
 
-# -------------------------------------------------------
-# Кнопка
-# -------------------------------------------------------
-class Button:
-    def __init__(self, texture, x, y, w, h, callback):
-        self.texture = texture
-        self.rect = sdl2.SDL_Rect(x, y, w, h)
-        self.callback = callback
+def glass_rect(surface, rect, alpha=140, blur_strength=6):
+    """Simple fake blur: capture region, scale down, scale up, draw with alpha."""
+    x, y, w, h = rect
+    sub = surface.subsurface(rect).copy()
 
-    def draw(self, renderer):
-        renderer.copy(self.texture, dstrect=self.rect)
+    small = pygame.transform.smoothscale(sub, (w//blur_strength, h//blur_strength))
+    blurred = pygame.transform.smoothscale(small, (w, h))
 
-    def click(self, x, y):
-        if (self.rect.x <= x <= self.rect.x + self.rect.w and
-            self.rect.y <= y <= self.rect.y + self.rect.h):
-            self.callback()
-            return True
-        return False
+    blurred.set_alpha(alpha)
+    surface.blit(blurred, (x, y))
 
 
-# -------------------------------------------------------
-# Основной UI
-# -------------------------------------------------------
-class PlayerUI:
-    def __init__(self, cover_path="cover.jpg"):
-        sdl2.ext.init()
+# ---------- INIT ----------
+screen = pygame.display.set_mode((SCREEN_W, SCREEN_H))
+clock = pygame.time.Clock()
 
-        self.window = sdl2.ext.Window(
-            "Music Player",
-            size=(800, 480),
-            flags=sdl2.SDL_WINDOW_FULLSCREEN
-        )
-        self.window.show()
+dominant = dominant_color(COVER_PATH)
+bg_color = dominant
 
-        self.renderer = sdl2.ext.Renderer(self.window)
-        self.factory = sdl2.ext.TextureSpriteFactory(self.renderer)
+cover_raw = Image.open(COVER_PATH)
+cover_size = min(SCREEN_W * 0.9, SCREEN_H * 0.9)
+cover_size = int(cover_size)
 
-        # Обложка и доминирующий цвет
-        self.cover_path = cover_path
-        self.cover_tex = self.factory.from_image(cover_path)
-        self.dominant_color = get_dominant_color(cover_path)
+cover_raw = cover_raw.resize((cover_size, cover_size))
+cover = pygame.image.fromstring(cover_raw.tobytes(), cover_raw.size, cover_raw.mode)
 
-        # Что сейчас показывает кнопка play/pause
-        self.is_playing = False
+cover_x = (SCREEN_W - cover_size) // 2
+cover_y = (SCREEN_H - cover_size) // 2 - 40
 
-        # Загружаем кнопки
-        self.btn_prev = self._load_button("icons/prev.png")
-        self.btn_play = self._load_button("icons/play.png")
-        self.btn_pause = self._load_button("icons/pause.png")
-        self.btn_next = self._load_button("icons/next.png")
-        self.btn_like = self._load_button("icons/like.png")
+# ---------- BUTTONS ----------
 
-        # Создаем объекты кнопок
-        self.buttons = self._setup_buttons()
+# Icons may be replaced with any image files
+def draw_icon(size=60, color=(255,255,255), shape="play"):
+    surf = pygame.Surface((size, size), pygame.SRCALPHA)
+    if shape == "play":
+        pygame.draw.polygon(surf, color, [(20,10),(20,50),(50,30)])
+    elif shape == "pause":
+        pygame.draw.rect(surf, color, (15,10,10,40))
+        pygame.draw.rect(surf, color, (35,10,10,40))
+    elif shape == "next":
+        pygame.draw.polygon(surf, color, [(15,10),(15,50),(40,30)])
+        pygame.draw.rect(surf, color, (45,10,5,40))
+    elif shape == "prev":
+        pygame.draw.polygon(surf, color, [(45,10),(45,50),(20,30)])
+        pygame.draw.rect(surf, color, (15,10,5,40))
+    elif shape == "heart":
+        pygame.draw.polygon(surf, color, [(30,15),(45,25),(30,45),(15,25)])
+    return surf
 
-    # -------------------------------------------------------
-    def _load_button(self, path):
-        return self.factory.from_image(path)
+ICON_SIZE = 60
 
-    # -------------------------------------------------------
-    def _setup_buttons(self):
-        w, h = self.window.size
-        panel_h = 90
+btn_prev  = draw_icon(ICON_SIZE, shape="prev")
+btn_play  = draw_icon(ICON_SIZE, shape="play")
+btn_next  = draw_icon(ICON_SIZE, shape="next")
+btn_like  = draw_icon(ICON_SIZE, shape="heart")
 
-        # размеры кнопок
-        bw = 64
-        bh = 64
-        center_y = h - panel_h // 2 - bh // 2
+panel_h = 120
+panel_y = SCREEN_H - panel_h
 
-        spacing = 120
-        cx = w // 2
+# Buttons positions
+gap = SCREEN_W // 5
 
-        def on_prev():
-            print("⏮ prev clicked")
+btn_prev_pos = (gap - ICON_SIZE//2, panel_y + panel_h//2 - ICON_SIZE//2)
+btn_play_pos = (2*gap - ICON_SIZE//2, panel_y + panel_h//2 - ICON_SIZE//2)
+btn_next_pos = (3*gap - ICON_SIZE//2, panel_y + panel_h//2 - ICON_SIZE//2)
+btn_like_pos = (4*gap - ICON_SIZE//2, panel_y + panel_h//2 - ICON_SIZE//2)
 
-        def on_play_pause():
-            self.is_playing = not self.is_playing
-            print("⏯ play/pause:", self.is_playing)
+buttons = {
+    "prev": pygame.Rect(btn_prev_pos[0], btn_prev_pos[1], ICON_SIZE, ICON_SIZE),
+    "play": pygame.Rect(btn_play_pos[0], btn_play_pos[1], ICON_SIZE, ICON_SIZE),
+    "next": pygame.Rect(btn_next_pos[0], btn_next_pos[1], ICON_SIZE, ICON_SIZE),
+    "like": pygame.Rect(btn_like_pos[0], btn_like_pos[1], ICON_SIZE, ICON_SIZE),
+}
 
-        def on_next():
-            print("⏭ next clicked")
-
-        def on_like():
-            print("❤ like clicked")
-
-        buttons = [
-            Button(self.btn_prev.texture, cx - spacing - bw // 2, center_y, bw, bh, on_prev),
-            Button(self.btn_play.texture, cx - bw // 2, center_y, bw, bh, on_play_pause),
-            Button(self.btn_next.texture, cx + spacing - bw // 2, center_y, bw, bh, on_next),
-            Button(self.btn_like.texture, w - bw - 20, center_y, bw, bh, on_like)
-        ]
-        return buttons
-
-    # -------------------------------------------------------
-    def draw_background(self):
-        # Мягкий фон по доминирующему цвету
-        r, g, b = self.dominant_color
-        self.renderer.clear(sdl2.SDL_Color(r, g, b))
-
-    # -------------------------------------------------------
-    def draw_cover(self):
-        w, h = self.window.size
-
-        # делаем квадратный размер
-        size = min(w, int(h * 0.8))
-
-        x = (w - size) // 2
-        y = (h - size) // 2 - 20
-
-        rect = sdl2.SDL_Rect(x, y, size, size)
-        self.renderer.copy(self.cover_tex.texture, dstrect=rect)
-
-    # -------------------------------------------------------
-    def draw_panel(self):
-        w, h = self.window.size
-        panel_h = 90
-
-        # «Liquid Glass» — имитация (полупрозрачный градиент)
-        for i in range(panel_h):
-            alpha = int(150 + 80 * (i / panel_h))  # сверху прозрачнее, снизу плотнее
-            rect = sdl2.SDL_Rect(0, h - panel_h + i, w, 1)
-            self.renderer.fill(rect, sdl2.SDL_Color(40, 40, 40, alpha))
-
-    # -------------------------------------------------------
-    def draw_buttons(self):
-        for b in self.buttons:
-            if b is self.buttons[1]:  # кнопка play/pause
-                # Заменяем картинку динамически
-                if self.is_playing:
-                    self.renderer.copy(
-                        self.btn_pause.texture,
-                        dstrect=b.rect
-                    )
-                else:
-                    self.renderer.copy(
-                        self.btn_play.texture,
-                        dstrect=b.rect
-                    )
-            else:
-                b.draw(self.renderer)
-
-    # -------------------------------------------------------
-    def run(self):
-        running = True
-
-        while running:
-            for event in sdl2.ext.get_events():
-
-                if event.type == sdl2.SDL_QUIT:
-                    running = False
-
-                # клик
-                if event.type == sdl2.SDL_MOUSEBUTTONDOWN:
-                    mx, my = event.button.x, event.button.y
-                    for b in self.buttons:
-                        b.click(mx, my)
-
-            # Рендеринг
-            self.draw_background()
-            self.draw_cover()
-            self.draw_panel()
-            self.draw_buttons()
-
-            self.renderer.present()
-
-        return 0
+is_playing = False
+liked = False
 
 
-# -------------------------------------------------------
-if __name__ == "__main__":
-    ui = PlayerUI()
-    sys.exit(ui.run())
+# ---------- MAIN LOOP ----------
+while True:
+    for event in pygame.event.get():
+        if event.type == pygame.QUIT:
+            pygame.quit()
+            sys.exit()
+
+        if event.type == pygame.MOUSEBUTTONDOWN:
+            mx, my = pygame.mouse.get_pos()
+
+            if buttons["prev"].collidepoint(mx,my):
+                print("Previous track")
+
+            if buttons["play"].collidepoint(mx,my):
+                is_playing = not is_playing
+                btn_play = draw_icon(ICON_SIZE, shape=("pause" if is_playing else "play"))
+
+            if buttons["next"].collidepoint(mx,my):
+                print("Next track")
+
+            if buttons["like"].collidepoint(mx,my):
+                liked = not liked
+                col = (255,50,50) if liked else (255,255,255)
+                btn_like = draw_icon(ICON_SIZE, color=col, shape="heart")
+
+    # Draw background
+    screen.fill(bg_color)
+
+    # Draw cover
+    screen.blit(cover, (cover_x, cover_y))
+
+    # Glass panel
+    glass_rect(screen, (0, panel_y, SCREEN_W, panel_h), alpha=180)
+
+    # Draw buttons
+    screen.blit(btn_prev, btn_prev_pos)
+    screen.blit(btn_play, btn_play_pos)
+    screen.blit(btn_next, btn_next_pos)
+    screen.blit(btn_like, btn_like_pos)
+
+    pygame.display.flip()
+    clock.tick(FPS)
