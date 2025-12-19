@@ -2,153 +2,121 @@
 <ui version="4.0">
  <class>MainWindow</class>
  <widget class="QMainWindow" name="MainWindow">
-  <property name="geometry">
-   <rect>
-    <x>0</x>
-    <y>0</y>
-    <width>800</width>
-    <height>538</height>
-   </rect>
-  </property>
   <property name="windowTitle">
    <string>Music Player</string>
   </property>
+
   <widget class="QWidget" name="centralwidget">
    <layout class="QVBoxLayout" name="mainLayout">
-    <item alignment="Qt::AlignmentFlag::AlignHCenter">
-     <widget class="QLabel" name="coverLabel">
-      <property name="minimumSize">
-       <size>
-        <width>350</width>
-        <height>350</height>
-       </size>
-      </property>
-      <property name="text">
-       <string>Cover</string>
-      </property>
-      <property name="scaledContents">
-       <bool>true</bool>
-      </property>
-      <property name="alignment">
-       <set>Qt::AlignmentFlag::AlignCenter</set>
-      </property>
-     </widget>
-    </item>
+    <property name="spacing">
+     <number>12</number>
+    </property>
+
+    <!-- ===== COVER CONTAINER ===== -->
     <item>
-     <widget class="QLabel" name="trackTitleLabel">
-      <property name="text">
-       <string>Track name</string>
-      </property>
-      <property name="alignment">
-       <set>Qt::AlignmentFlag::AlignCenter</set>
-      </property>
-     </widget>
-    </item>
-    <item>
-     <widget class="QLabel" name="artistLabel">
-      <property name="text">
-       <string>Artist</string>
-      </property>
-      <property name="alignment">
-       <set>Qt::AlignmentFlag::AlignCenter</set>
-      </property>
-     </widget>
-    </item>
-    <item>
-     <widget class="QFrame" name="controlPanel">
-      <property name="minimumSize">
-       <size>
-        <width>0</width>
-        <height>120</height>
-       </size>
-      </property>
+     <widget class="QFrame" name="coverContainer">
       <property name="frameShape">
-       <enum>QFrame::Shape::StyledPanel</enum>
+       <enum>QFrame::NoFrame</enum>
       </property>
-      <layout class="QHBoxLayout" name="controlLayout">
-       <item>
-        <widget class="QPushButton" name="prevBtn">
+      <layout class="QVBoxLayout" name="coverLayout">
+       <item alignment="Qt::AlignCenter">
+        <widget class="QLabel" name="coverLabel">
          <property name="sizePolicy">
-          <sizepolicy hsizetype="Minimum" vsizetype="Fixed">
-           <horstretch>0</horstretch>
-           <verstretch>0</verstretch>
-          </sizepolicy>
+          <sizepolicy hsizetype="Expanding" vsizetype="Expanding"/>
          </property>
-         <property name="minimumSize">
-          <size>
-           <width>0</width>
-           <height>60</height>
-          </size>
+         <property name="text">
+          <string/>
          </property>
-        </widget>
-       </item>
-       <item>
-        <spacer name="horizontalSpacer">
-         <property name="orientation">
-          <enum>Qt::Orientation::Horizontal</enum>
-         </property>
-         <property name="sizeType">
-          <enum>QSizePolicy::Policy::Preferred</enum>
-         </property>
-         <property name="sizeHint" stdset="0">
-          <size>
-           <width>40</width>
-           <height>20</height>
-          </size>
-         </property>
-        </spacer>
-       </item>
-       <item>
-        <widget class="QPushButton" name="playBtn">
-         <property name="sizePolicy">
-          <sizepolicy hsizetype="Minimum" vsizetype="Fixed">
-           <horstretch>0</horstretch>
-           <verstretch>0</verstretch>
-          </sizepolicy>
-         </property>
-         <property name="minimumSize">
-          <size>
-           <width>0</width>
-           <height>60</height>
-          </size>
-         </property>
-        </widget>
-       </item>
-       <item>
-        <spacer name="horizontalSpacer_2">
-         <property name="orientation">
-          <enum>Qt::Orientation::Horizontal</enum>
-         </property>
-         <property name="sizeType">
-          <enum>QSizePolicy::Policy::Preferred</enum>
-         </property>
-         <property name="sizeHint" stdset="0">
-          <size>
-           <width>40</width>
-           <height>20</height>
-          </size>
-         </property>
-        </spacer>
-       </item>
-       <item>
-        <widget class="QPushButton" name="nextBtn">
-         <property name="sizePolicy">
-          <sizepolicy hsizetype="Minimum" vsizetype="Fixed">
-           <horstretch>0</horstretch>
-           <verstretch>0</verstretch>
-          </sizepolicy>
-         </property>
-         <property name="minimumSize">
-          <size>
-           <width>0</width>
-           <height>60</height>
-          </size>
+         <property name="alignment">
+          <set>Qt::AlignCenter</set>
          </property>
         </widget>
        </item>
       </layout>
      </widget>
     </item>
+
+    <!-- ===== TRACK ===== -->
+    <item>
+     <widget class="QLabel" name="trackTitleLabel">
+      <property name="alignment">
+       <set>Qt::AlignCenter</set>
+      </property>
+     </widget>
+    </item>
+
+    <item>
+     <widget class="QLabel" name="artistLabel">
+      <property name="alignment">
+       <set>Qt::AlignCenter</set>
+      </property>
+     </widget>
+    </item>
+
+    <!-- ===== CONTROL PANEL ===== -->
+    <item>
+     <widget class="QFrame" name="controlPanel">
+      <property name="minimumHeight">
+       <number>120</number>
+      </property>
+      <property name="maximumHeight">
+       <number>120</number>
+      </property>
+      <layout class="QHBoxLayout" name="controlLayout">
+       <property name="spacing">
+        <number>24</number>
+       </property>
+
+       <item>
+        <widget class="QPushButton" name="prevBtn">
+         <property name="minimumHeight">
+          <number>60</number>
+         </property>
+        </widget>
+       </item>
+
+       <item>
+        <spacer name="spacer1">
+         <property name="orientation">
+          <enum>Qt::Horizontal</enum>
+         </property>
+         <property name="sizeType">
+          <enum>QSizePolicy::Expanding</enum>
+         </property>
+        </spacer>
+       </item>
+
+       <item>
+        <widget class="QPushButton" name="playBtn">
+         <property name="minimumHeight">
+          <number>60</number>
+         </property>
+        </widget>
+       </item>
+
+       <item>
+        <spacer name="spacer2">
+         <property name="orientation">
+          <enum>Qt::Horizontal</enum>
+         </property>
+         <property name="sizeType">
+          <enum>QSizePolicy::Expanding</enum>
+         </property>
+        </spacer>
+       </item>
+
+       <item>
+        <widget class="QPushButton" name="nextBtn">
+         <property name="minimumHeight">
+          <number>60</number>
+         </property>
+        </widget>
+       </item>
+
+      </layout>
+     </widget>
+    </item>
+
    </layout>
   </widget>
  </widget>

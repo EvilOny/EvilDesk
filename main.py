@@ -1,4 +1,6 @@
 import sys
+import argparse
+import time
 import json
 import base64
 import asyncio
@@ -8,7 +10,7 @@ from io import BytesIO
 from PySide6.QtWidgets import (
     QApplication, QMainWindow, QLabel, QPushButton, QGraphicsBlurEffect, QGraphicsOpacityEffect
 )
-from PySide6.QtCore import Qt, QObject, Signal, QPropertyAnimation, QEasingCurve, Property
+from PySide6.QtCore import Qt, QObject, Signal, QPropertyAnimation, QEasingCurve, Property, QTimer
 from PySide6.QtGui import QPixmap, QIcon, QColor, QLinearGradient, QBrush, QPainter, QFont, QFontDatabase
 from PySide6.QtUiTools import QUiLoader
 from PySide6.QtCore import QFile
@@ -21,8 +23,6 @@ except Exception:
     _HAS_COLORTHIEF = False
 
 import websockets
-
-WS_URL = "ws://127.0.0.1:8765"
 
 
 class WSBridge(QObject):
@@ -55,7 +55,7 @@ class MusicPlayer(QMainWindow):
         self.bg_label.setGraphicsEffect(blur)
 
         # show window
-        self.setWindowFlags(Qt.FramelessWindowHint)
+        self.setWindowFlags(Qt.Window)
         self.resize(800, 480)
         self.show()
 
@@ -89,6 +89,14 @@ class MusicPlayer(QMainWindow):
         for btn in (self.prevBtn, self.playBtn, self.nextBtn):
             btn.setIconSize(btn.size())
 
+        # ===== exit =====
+
+        self._touch_start_time = None
+        self._touch_start_pos = None
+        self._exit_timer = QTimer(self)
+        self._exit_timer.setSingleShot(True)
+        self._exit_timer.timeout.connect(self.safe_exit)
+
         # ===== button handlers =====
         self.prevBtn.clicked.connect(lambda: self.send_command("prev"))
         self.playBtn.clicked.connect(lambda: self.send_command("playpause"))
@@ -102,7 +110,7 @@ class MusicPlayer(QMainWindow):
         self.fade_anim.setEasingCurve(QEasingCurve.InOutQuad)
 
         # ===== background interpolation =====
-        self.current_bg_colors = None  # [(r1,g1,b1),(r2,g2,b2)]
+        self.current_bg_colors = None
         self.bg_anim = QPropertyAnimation(self, b"bg_t")
         self.bg_anim.setDuration(600)
         self.bg_anim.setEasingCurve(QEasingCurve.InOutQuad)
@@ -122,7 +130,6 @@ class MusicPlayer(QMainWindow):
         self.start_ws_thread()
         self.apply_styles()
 
-    # ===== property for animation interpolation =====
     def get_bg_t(self):
         return self._bg_t
 
@@ -133,10 +140,21 @@ class MusicPlayer(QMainWindow):
 
     def resizeEvent(self, ev):
         super().resizeEvent(ev)
+
         if hasattr(self, "bg_label") and self.bg_label:
             self.bg_label.setGeometry(0, 0, self.width(), self.height())
+
         if hasattr(self, "status_label"):
-            self.status_label.setGeometry(self.width()-200, 8, 190, 20)
+            self.status_label.setGeometry(self.width() - 200, 8, 190, 20)
+
+        if hasattr(self, "cover") and self.cover and self.cover.pixmap():
+            self.cover.setPixmap(
+                self.cover.pixmap().scaled(
+                    self.cover.size(),
+                    Qt.KeepAspectRatio,
+                    Qt.SmoothTransformation
+                )
+            )
 
     def apply_styles(self):
         self.setStyleSheet("""
@@ -149,13 +167,11 @@ class MusicPlayer(QMainWindow):
             font-weight: 500;
         }
 
-        /* Панель управления */
         QFrame#controlPanel { 
             background: rgba(255,255,255,20); 
             border-radius: 18px; 
         }
 
-        /* Кнопки — прозрачные, без подсветки при наведении */
         QPushButton {
             background: transparent;
             border: none;
@@ -184,7 +200,9 @@ class MusicPlayer(QMainWindow):
                         except Exception:
                             continue
                         if payload.get("type") == "state":
-                            bridge.state_received.emit(payload.get("data", {}))
+                            data = payload.get("data")
+                            if isinstance(data, dict):
+                                bridge.state_received.emit(data)
             except Exception:
                 self._ws = None
                 bridge.disconnected.emit()
@@ -208,37 +226,41 @@ class MusicPlayer(QMainWindow):
         self.status_label.setText("Disconnected")
         self.status_label.setStyleSheet("color: salmon; font-size:12px;")
 
-    # ===== main update =====
     def update_from_ws(self, data: dict):
         try:
             cover_b64 = data.get("cover")
-            if cover_b64:
-                img_bytes = base64.b64decode(cover_b64)
-                qpix = QPixmap()
-                qpix.loadFromData(img_bytes)
 
-                # cover animation
-                self.fade_anim.stop()
-                self.cover_effect.setOpacity(0.0)
-                self.cover.setPixmap(qpix)
-                self.cover.setScaledContents(True)
-                self.fade_anim.setStartValue(0.0)
-                self.fade_anim.setEndValue(1.0)
-                self.fade_anim.start()
+            if isinstance(cover_b64, str) and len(cover_b64) > 50:
+                try:
+                    img_bytes = base64.b64decode(cover_b64)
+                    qpix = QPixmap()
+                    if qpix.loadFromData(img_bytes):
+                        self.fade_anim.stop()
+                        self.cover_effect.setOpacity(0.0)
+                        pix = qpix.scaled(
+                            self.cover.size(),
+                            Qt.KeepAspectRatio,
+                            Qt.SmoothTransformation
+                        )
+                        self.cover.setPixmap(pix)
+                        self.fade_anim.setStartValue(0.0)
+                        self.fade_anim.setEndValue(1.0)
+                        self.fade_anim.start()
+                        self.animate_bg_from_bytes(img_bytes)
+                except Exception as e:
+                    print("Cover decode error:", e)
 
-                # background animation
-                self.animate_bg_from_bytes(img_bytes)
+            self.track_title.setText(data.get("track") or "—")
+            self.artist.setText(data.get("artist") or "—")
 
-            self.track_title.setText(data.get("track", "Unknown"))
-            self.artist.setText(data.get("artist", "Unknown"))
             if data.get("is_playing"):
                 self.playBtn.setIcon(self.icons["pause"])
             else:
                 self.playBtn.setIcon(self.icons["play"])
+
         except Exception as e:
             print("Error updating GUI:", e)
 
-    # ===== interpolate colors =====
     @staticmethod
     def interpolate_color(c1, c2, t):
         r = int(c1[0] + (c2[0]-c1[0])*t)
@@ -260,12 +282,7 @@ class MusicPlayer(QMainWindow):
                 g = sum(p[1] for p in pixels) // len(pixels)
                 b = sum(p[2] for p in pixels) // len(pixels)
 
-            top_multiplier = 1.0
-            bottom_multiplier = 0.28
-            new_colors = [
-                (int(min(255, r*top_multiplier)), int(min(255, g*top_multiplier)), int(min(255, b*top_multiplier))),
-                (int(r*bottom_multiplier), int(g*bottom_multiplier), int(b*bottom_multiplier))
-            ]
+            new_colors = [(r, g, b), (r//3, g//3, b//3)]
 
             if self.current_bg_colors is None:
                 self.current_bg_colors = new_colors
@@ -302,8 +319,37 @@ class MusicPlayer(QMainWindow):
         painter.end()
         return pix
 
+    def mousePressEvent(self, event):
+        if event.button() == Qt.LeftButton:
+            pos = event.position().toPoint()
+
+            # Скрытая зона: левый нижний угол
+            if pos.x() < 80 and pos.y() > self.height() - 80:
+                self._touch_start_time = time.time()
+                self._touch_start_pos = pos
+                self._exit_timer.start(3500)  # 3.5 секунды
+
+    def mouseReleaseEvent(self, event):
+        self._exit_timer.stop()
+        self._touch_start_time = None
+        self._touch_start_pos = None
+
+    def safe_exit(self):
+        try:
+            if self._ws_loop:
+                self._ws_loop.call_soon_threadsafe(self._ws_loop.stop)
+        except Exception:
+            pass
+        QApplication.quit()
 
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--ws", type=str, default="127.0.0.1:8765",
+                        help="WebSocket server IP and port, e.g. 192.168.1.100:8765")
+    args = parser.parse_args()
+
+    WS_URL = f"ws://{args.ws}"
+
     app = QApplication(sys.argv)
 
     font_id = QFontDatabase.addApplicationFont("fonts/MontserratAlternates-Medium.ttf")

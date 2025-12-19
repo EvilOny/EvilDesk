@@ -14,6 +14,21 @@
 pip install -r requirments.txt
 ```
 
+
+## Запуск
+
+Сервер поднимается путём запуска файла *server.py*:
+
+```
+python server.py
+```
+
+Клиент запускается через файл *main.py*:
+```
+python main.py --ws <Server IP>:<Port>
+```
+
+
 ## Лист заданий
 
 - [x] Определиться с библиотеками

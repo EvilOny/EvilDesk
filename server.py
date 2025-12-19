@@ -87,12 +87,12 @@ async def handler(ws):
 
     finally:
         clients.remove(ws)
-        print("❌ Клиент отключён")
+        print("Клиент отключён")
 
 
 async def main():
     async with websockets.serve(handler, "0.0.0.0", 8765):
-        print("✅ WebSocket сервер запущен")
+        print("Cервер запущен")
         await broadcast_state()
 
 asyncio.run(main())
