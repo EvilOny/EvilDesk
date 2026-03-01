@@ -1,0 +1,37 @@
+{
+    "sections": [
+        {
+            "title": "Настройки",
+            "items": [
+                {
+                    "id": "wsip",
+                    "name": "IP сервера WebSocket",
+                    "description": "",
+                    "type": "text",
+                    "buttons": [
+                        {
+                            "id": "ip",
+                            "name": "IP",
+                            "text": "127.0.0.1",
+                            "defaultParameter": "127.0.0.1"
+                        }
+                    ]
+                },
+                {
+                    "id": "wsport",
+                    "name": "Порт сервера WebSocket",
+                    "description": "",
+                    "type": "text",
+                    "buttons": [
+                        {
+                            "id": "port",
+                            "name": "Порт",
+                            "text": "8765",
+                            "defaultParameter": "8765"
+                        }
+                    ]
+                }
+            ]
+        }
+    ]
+}
