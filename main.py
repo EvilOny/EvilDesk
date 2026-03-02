@@ -65,8 +65,10 @@ class MusicPlayer(QMainWindow):
 
         # show window
         self.setWindowFlags(Qt.FramelessWindowHint)
-        #self.resize(800, 480)
-        self.showFullScreen()
+        self.resize(800, 480)
+        self.show()
+        #self.showFullScreen()
+        #self.setCursor(Qt.BlankCursor)
 
         # ===== widgets =====
         self.cover = self.ui.findChild(QLabel, "coverLabel")
@@ -129,6 +131,15 @@ class MusicPlayer(QMainWindow):
         self.fade_anim = QPropertyAnimation(self.cover_effect, b"opacity")
         self.fade_anim.setDuration(350)
         self.fade_anim.setEasingCurve(QEasingCurve.InOutQuad)
+
+        # ===== background interpolation =====¶
+        self.current_bg_colors = None
+        self.bg_anim = QPropertyAnimation(self, b"bg_t")
+        self.bg_anim.setDuration(600)
+        self.bg_anim.setEasingCurve(QEasingCurve.InOutQuad)
+        self._bg_t = 0.0
+        self.bg_anim.valueChanged.connect(self.update_bg_gradient)
+
 
         # ===== connect signals =====
         bridge.state_received.connect(self.update_from_ws)
@@ -240,8 +251,6 @@ class MusicPlayer(QMainWindow):
                     if self.current_cover != resp:
                         self.load_cover_from_url(resp)
                         self.current_cover = resp
-                        data = requests.get(resp).content
-                        self.set_background_from_bytes(data)
 
             elif req == "trackName":
                 self.track_title.setText(resp or "—")
