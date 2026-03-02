@@ -55,21 +55,6 @@ class MusicPlayer(QMainWindow):
         self.poll_timer.start(1000)
 
         # ===== background =====
-        self.bg_blur_label = QLabel(self.centralWidget())
-        self.bg_blur_label.setGeometry(0, 0, self.width(), self.height())
-        self.bg_blur_label.lower()
-        self.bg_blur_label.setAttribute(Qt.WA_TransparentForMouseEvents)
-
-        self.bg_gradient_label = QLabel(self.centralWidget())
-        self.bg_gradient_label.setGeometry(0, 0, self.width(), self.height())
-        self.bg_gradient_label.lower()
-        self.bg_gradient_label.setAttribute(Qt.WA_TransparentForMouseEvents)
-
-        self.bg_vignette_label = QLabel(self.centralWidget())
-        self.bg_vignette_label.setGeometry(0, 0, self.width(), self.height())
-        self.bg_vignette_label.lower()
-        self.bg_vignette_label.setAttribute(Qt.WA_TransparentForMouseEvents)
-
         self.bg_label = QLabel(self.centralWidget())
         self.bg_label.setGeometry(0, 0, self.width(), self.height())
         self.bg_label.lower()
@@ -80,8 +65,8 @@ class MusicPlayer(QMainWindow):
 
         # show window
         self.setWindowFlags(Qt.FramelessWindowHint)
-        self.resize(800, 480)
-        self.show()
+        #self.resize(800, 480)
+        self.showFullScreen()
 
         # ===== widgets =====
         self.cover = self.ui.findChild(QLabel, "coverLabel")
@@ -298,104 +283,61 @@ class MusicPlayer(QMainWindow):
 
     # ===== Остальной код GUI и анимации =====
     def interpolate_color(self, c1, c2, t):
-        r = int(c1[0] + (c2[0]-c1[0])*t)
-        g = int(c1[1] + (c2[1]-c1[1])*t)
-        b = int(c1[2] + (c2[2]-c1[2])*t)
+        r = int(c1[0] + (c2[0] - c1[0]) * t)
+        g = int(c1[1] + (c2[1] - c1[1]) * t)
+        b = int(c1[2] + (c2[2] - c1[2]) * t)
         return r, g, b
 
-    def set_background_from_bytes(self, img_bytes: bytes):
-        """
-        Устанавливает полный стек фона: блюр, градиент, виньетка, шум.
-        """
+    def animate_bg_from_bytes(self, img_bytes: bytes):
         try:
-            # --- 1. Создаём размытый pixmap ---
-            img = Image.open(BytesIO(img_bytes)).convert("RGB")
-            img = img.resize((self.width() * 2, self.height() * 2), Image.LANCZOS)  # overscale для мягкости
-            img = img.filter(ImageFilter.GaussianBlur(40))  # сильный блюр
+            if _HAS_COLORTHIEF:
+                buf = BytesIO(img_bytes)
+                ct = ColorThief(buf)
+                r, g, b = ct.get_color(quality=1)
+            else:
+                img = Image.open(BytesIO(img_bytes)).convert("RGB")
+                img = img.resize((60, 60))
+                pixels = list(img.getdata())
+                r = sum(p[0] for p in pixels) // len(pixels)
+                g = sum(p[1] for p in pixels) // len(pixels)
+                b = sum(p[2] for p in pixels) // len(pixels)
 
-            qt_img = ImageQt(img)
-            pix = QPixmap.fromImage(qt_img)
-            self.bg_blur_label.setPixmap(pix)
-            self.bg_blur_label.setGeometry(-self.width() // 2, -self.height() // 2,
-                                           self.width() * 2, self.height() * 2)
+            new_colors = [(r, g, b), (r // 3, g // 3, b // 3)]
 
-            # --- 2. Цветовой градиент ---
-            r, g, b = self.extract_main_color(img)
-            grad_pix = QPixmap(self.size())
-            grad_pix.fill(Qt.transparent)
+            if self.current_bg_colors is None:
+                self.current_bg_colors = new_colors
+                pix = self.create_gradient_pixmap(new_colors)
+                self.bg_label.setPixmap(pix)
+                return
 
-            painter = QPainter(grad_pix)
-            linear_grad = QLinearGradient(0, 0, 0, self.height())
-            linear_grad.setColorAt(0.0, QColor(r, g, b, 180))
-            linear_grad.setColorAt(1.0, QColor(r // 3, g // 3, b // 3, 150))
-            painter.fillRect(grad_pix.rect(), linear_grad)
-            painter.end()
-            self.bg_gradient_label.setPixmap(grad_pix)
-
-            # --- 3. Виньетка ---
-            vignette_pix = QPixmap(self.size())
-            vignette_pix.fill(Qt.transparent)
-            painter = QPainter(vignette_pix)
-            radial_grad = QRadialGradient(
-                self.width() // 2,
-                self.height() // 2,
-                max(self.width(), self.height()) * 0.7
-            )
-            radial_grad.setColorAt(0.6, QColor(0, 0, 0, 0))
-            radial_grad.setColorAt(1.0, QColor(0, 0, 0, 180))
-            painter.fillRect(vignette_pix.rect(), radial_grad)
-            painter.end()
-            self.bg_vignette_label.setPixmap(vignette_pix)
-
-            # --- 4. Лёгкий шум (убирает ступенчатость) ---
-            self.add_noise_to_label(self.bg_vignette_label)
+            self.old_bg_colors = self.current_bg_colors
+            self.new_bg_colors = new_colors
+            self.bg_anim.stop()
+            self.bg_anim.setStartValue(0.0)
+            self.bg_anim.setEndValue(1.0)
+            self.bg_anim.start()
 
         except Exception as e:
-            print("Ошибка обновления фона:", e)
+            print("animate_bg_from_bytes error:", e)
 
-    # ------------------------------
-    # 2. Извлечение основного цвета через ColorThief или PIL
-    # ------------------------------
-    def extract_main_color(self, img: Image.Image):
-        """
-        Возвращает основной цвет картинки. Если белый фон с чёрным силуэтом,
-        приоритет отдаём более светлому цвету.
-        """
-        try:
-            pixels = list(img.getdata())
-            # создаём словарь {цвет: кол-во}
-            count = {}
-            for px in pixels:
-                count[px] = count.get(px, 0) + 1
+    def update_bg_gradient(self, t):
+        c_top = self.interpolate_color(self.old_bg_colors[0], self.new_bg_colors[0], t)
+        c_bottom = self.interpolate_color(self.old_bg_colors[1], self.new_bg_colors[1], t)
+        pix = self.create_gradient_pixmap([c_top, c_bottom])
+        self.bg_label.setPixmap(pix)
+        if t >= 1.0:
+            self.current_bg_colors = self.new_bg_colors
 
-            # сортируем по яркости (luminance) с приоритетом светлого цвета
-            def lum(c):
-                return 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2]
-
-            # берём 10 самых частых цветов
-            top_colors = sorted(count.items(), key=lambda x: x[1], reverse=True)[:10]
-            dominant = max([c for c, _ in top_colors], key=lum)
-            return dominant
-        except Exception as e:
-            print("extract_main_color error:", e)
-            return (50, 50, 50)  # дефолт серый
-
-    # ------------------------------
-    # 3. Лёгкий шум
-    # ------------------------------
-    def add_noise_to_label(self, label: QLabel):
-        pix = label.pixmap()
-        if pix is None:
-            return
+    def create_gradient_pixmap(self, colors):
+        grad = QLinearGradient(0, 0, 0, self.height())
+        grad.setColorAt(0.4, QColor(*colors[0], 230))
+        grad.setColorAt(1, QColor(*colors[1], 200))
+        pix = QPixmap(self.bg_label.size())
+        pix.fill(Qt.transparent)
         painter = QPainter(pix)
-        painter.setCompositionMode(QPainter.CompositionMode_Overlay)
-        for _ in range(5000):
-            x = random.randint(0, pix.width() - 1)
-            y = random.randint(0, pix.height() - 1)
-            alpha = random.randint(5, 15)
-            painter.fillRect(x, y, 1, 1, QColor(255, 255, 255, alpha))
+        painter.fillRect(pix.rect(), QBrush(grad))
         painter.end()
-        label.setPixmap(pix)
+        return pix
 
     def mousePressEvent(self, event):
         if event.button() == Qt.LeftButton:
