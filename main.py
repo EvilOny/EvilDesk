@@ -5,10 +5,10 @@ import json
 import asyncio
 import threading
 
-import random
-from PIL.ImageQt import ImageQt
-from PySide6.QtGui import QRadialGradient
-from PIL import ImageFilter
+#import random
+#from PIL.ImageQt import ImageQt
+#from PySide6.QtGui import QRadialGradient
+#from PIL import ImageFilter
 from io import BytesIO
 
 from PySide6.QtWidgets import (
@@ -60,7 +60,7 @@ class MusicPlayer(QMainWindow):
         self.bg_label.lower()
         self.bg_label.setAttribute(Qt.WA_TransparentForMouseEvents)
         blur = QGraphicsBlurEffect()
-        blur.setBlurRadius(30)
+        blur.setBlurRadius(100)
         self.bg_label.setGraphicsEffect(blur)
 
         # show window
@@ -226,8 +226,7 @@ class MusicPlayer(QMainWindow):
         self.send_command({"request": "coverImage"})
         self.send_command({"request": "playingState"})
         self.send_command({"request": "likeState"})
-        self.send_command({"request": "trackName"})
-        self.send_command({"request": "artistName"})
+        self.send_command({"request": "trackInfo"})
 
     def update_from_ws(self, data: dict):
         try:
@@ -252,11 +251,10 @@ class MusicPlayer(QMainWindow):
                         self.load_cover_from_url(resp)
                         self.current_cover = resp
 
-            elif req == "trackName":
-                self.track_title.setText(resp or "—")
-
-            elif req == "artistName":
-                self.artist.setText(resp or "—")
+            elif req == "trackInfo":
+                track, artist = resp.split(";;")
+                self.track_title.setText(track or "-")
+                self.artist.setText(artist or "-")
 
         except Exception as e:
             print("Error updating GUI:", e)
