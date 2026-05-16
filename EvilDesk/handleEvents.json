@@ -1,0 +1,25 @@
+{
+    "sections": [
+        {
+            "title": "EvilDesk WebSocket",
+            "items": [
+                {
+                    "id": "wsip",
+                    "name": "IP адрес сервера",
+                    "description": "Адрес Python-приложения EvilDesk",
+                    "type": "text",
+                    "input": "127.0.0.1",
+                    "defaultParameter": "127.0.0.1"
+                },
+                {
+                    "id": "wsport",
+                    "name": "Порт сервера",
+                    "description": "Порт WebSocket-соединения",
+                    "type": "text",
+                    "input": "8080",
+                    "defaultParameter": "8080"
+                }
+            ]
+        }
+    ]
+}

@@ -1,0 +1,27 @@
+{
+    "id": "evildesk-controller",
+    "name": "EvilDesk Controller",
+    "description": "Управление Яндекс Музыкой через WebSocket для интеграции с внешними устройствами.",
+    "version": "1.0.0",
+    "author": "Andrei Filippov",
+    "type": "script",
+    "image": "",
+    "banner": "",
+    "libraryLogo": "",
+    "css": "script.css",
+    "script": "script.js",
+    "tags": [
+        "websocket",
+        "player",
+        "desktop",
+        "evil"
+    ],
+    "dependencies": [],
+    "allowedUrls": [
+        "ws://localhost:*",
+        "ws://127.0.0.1:*",
+        "wss://*"
+    ],
+    "supportedVersions": [],
+    "installSource": "local"
+}
